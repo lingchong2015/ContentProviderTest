@@ -24,6 +24,13 @@
             </intent-filter>
         </activity>
 
+        <provider
+            android:authorities="com.curry.stephen.contentprovidertest.NotePadProvider"
+            android:name=".NotePadProvider"
+            android:exported="false">
+            <grant-uri-permission android:pathPattern=".*"/>
+        </provider>
+
     </application>
 
 </manifest>

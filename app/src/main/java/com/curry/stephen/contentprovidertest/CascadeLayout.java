@@ -34,25 +34,27 @@ public class CascadeLayout extends ViewGroup {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width;
         int height;
-        int verticalSpacing = 0;
+        int layoutVerticalSpacing = 0;
         int childWidth = 0;
         int childHeight = 0;
 
         final int count = getChildCount();
         for (int i = 0; i < count; ++i) {
             View child = getChildAt(i);
-            measureChild(child, widthMeasureSpec, heightMeasureSpec);
+            measureChild(child, widthMeasureSpec, heightMeasureSpec);// Ask child to measure itself.
 
-            LayoutParams layoutParams = (LayoutParams) child.getLayoutParams();
+            LayoutParams layoutParams = (LayoutParams) child.getLayoutParams(); // Get layout parameters of child.
+
+            // Set the layout parameters of child.
             width = getPaddingLeft() + mHorizontalSpacing * i;
             height = getPaddingTop() + mVerticalSpacing * i;
-
             layoutParams.x = width;
             if (layoutParams.mLayoutVerticalSpacing >= 0) {
-                verticalSpacing = layoutParams.mLayoutVerticalSpacing;
+                layoutVerticalSpacing = layoutParams.mLayoutVerticalSpacing;
             }
-            layoutParams.y = height + verticalSpacing;
+            layoutParams.y = height + layoutVerticalSpacing;
 
+            // Record the space of children.
             childWidth += child.getMeasuredWidth();
             childHeight += child.getMeasuredHeight();
         }

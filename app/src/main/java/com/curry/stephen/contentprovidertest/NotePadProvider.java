@@ -79,13 +79,19 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
         // Add a pattern that routes URIs terminated with "live_folder/notes" to a live folder operation.
         sUrimatcher.addURI(NotePadContract.AUTHORITY, "live_folder/notes", LIVE_FOLDER_NOTES);
 
-        // Create a new projection map instance.
+        // Create a new projection map instance. The map returns a column name by given a string. The two are usually equal.
         sMapNotesProjection = new HashMap<>();
+        // Maps the string "_ID" to the column name "_ID".
         sMapNotesProjection.put(NotePadContract.Notes._ID, NotePadContract.Notes._ID);
+        // Maps "title" to "title".
         sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_TITLE, NotePadContract.Notes.COLUMN_NAME_TITLE);
+        // Maps "note" to "note".
         sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_NOTE, NotePadContract.Notes.COLUMN_NAME_NOTE);
+        // Maps "created" to "created"
         sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_CREATE_DATE, NotePadContract.Notes.COLUMN_NAME_CREATE_DATE);
         sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE, NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE);
+
+
     }
 
     private static class DatabaseHelper extends SQLiteOpenHelper {

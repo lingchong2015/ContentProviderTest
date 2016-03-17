@@ -34,7 +34,6 @@ public class CascadeLayout extends ViewGroup {
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width;
         int height;
-        int layoutVerticalSpacing = 0;
         int childWidth = 0;
         int childHeight = 0;
 
@@ -49,6 +48,8 @@ public class CascadeLayout extends ViewGroup {
             width = getPaddingLeft() + mHorizontalSpacing * i;
             height = getPaddingTop() + mVerticalSpacing * i;
             layoutParams.x = width;
+
+            int layoutVerticalSpacing = 0;
             if (layoutParams.mLayoutVerticalSpacing >= 0) {
                 layoutVerticalSpacing = layoutParams.mLayoutVerticalSpacing;
             }
@@ -96,6 +97,7 @@ public class CascadeLayout extends ViewGroup {
         return new LayoutParams(p.width, p.height);
     }
 
+    // This is the class for children of CascadeLayout which include layout_xxx attributes.
     public static class LayoutParams extends ViewGroup.LayoutParams {
 
         private int x;

@@ -7,11 +7,13 @@ import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.provider.LiveFolders;
 import android.support.annotation.Nullable;
+import android.text.TextUtils;
 import android.util.Log;
 
 import java.util.HashMap;
@@ -19,7 +21,8 @@ import java.util.HashMap;
 /**
  * Created by Administrator on 2016/3/15 0015.
  */
-public class NotePadProvider extends ContentProvider implements ContentProvider.PipeDataWriter<Cursor> {
+public class NotePadProvider extends ContentProvider
+        implements ContentProvider.PipeDataWriter<Cursor> {
 
     /**
      * Used for debugging and logging.
@@ -44,7 +47,7 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
     /**
      * Standard projection for the interesting columns of a normal note.
      */
-    private static final String[] READ_NOTE_PROJECTION = new String[] {
+    private static final String[] READ_NOTE_PROJECTION = new String[]{
             NotePadContract.Notes._ID,
             NotePadContract.Notes.COLUMN_NAME_NOTE,
             NotePadContract.Notes.COLUMN_NAME_TITLE
@@ -81,30 +84,39 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
         sUrimatcher = new UriMatcher(UriMatcher.NO_MATCH);
         // Add a pattern that routes URIs terminated with "notes" to a NOTES operation.
         sUrimatcher.addURI(NotePadContract.AUTHORITY, "notes", NOTES);
-        // Add a pattern that routes URIs terminated with "notes" plus an integer to a NOTE ID operation.
+        // Add a pattern that routes URIs terminated with "notes" plus an integer to a NOTE ID
+        // operation.
         sUrimatcher.addURI(NotePadContract.AUTHORITY, "notes/#", NOTE_ID);
-        // Add a pattern that routes URIs terminated with "live_folder/notes" to a live folder operation.
+        // Add a pattern that routes URIs terminated with "live_folder/notes" to a live folder
+        // operation.
         sUrimatcher.addURI(NotePadContract.AUTHORITY, "live_folder/notes", LIVE_FOLDER_NOTES);
 
-        // Create a new projection map instance. The map returns a column name by given a string. The two are usually equal.
+        // Create a new projection map instance. The map returns a column name by given a string.
+        // The two are usually equal.
         sMapNotesProjection = new HashMap<>();
         // Maps the string "_ID" to the column name "_ID".
         sMapNotesProjection.put(NotePadContract.Notes._ID, NotePadContract.Notes._ID);
         // Maps "title" to "title".
-        sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_TITLE, NotePadContract.Notes.COLUMN_NAME_TITLE);
+        sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_TITLE,
+                NotePadContract.Notes.COLUMN_NAME_TITLE);
         // Maps "note" to "note".
-        sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_NOTE, NotePadContract.Notes.COLUMN_NAME_NOTE);
+        sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_NOTE,
+                NotePadContract.Notes.COLUMN_NAME_NOTE);
         // Maps "created" to "created"
-        sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_CREATE_DATE, NotePadContract.Notes.COLUMN_NAME_CREATE_DATE);
+        sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_CREATE_DATE,
+                NotePadContract.Notes.COLUMN_NAME_CREATE_DATE);
         sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE,
                 NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE);
 
-        sMapLiveFolderProjection.put(LiveFolders._ID, NotePadContract.Notes._ID + " AS " + LiveFolders._ID);
-        sMapLiveFolderProjection.put(LiveFolders.NAME, NotePadContract.Notes.COLUMN_NAME_TITLE + " AS " + LiveFolders.NAME);
+        sMapLiveFolderProjection.put(LiveFolders._ID,
+                NotePadContract.Notes._ID + " AS " + LiveFolders._ID);
+        sMapLiveFolderProjection.put(LiveFolders.NAME,
+                NotePadContract.Notes.COLUMN_NAME_TITLE + " AS " + LiveFolders.NAME);
     }
 
     /**
-     * This class helps open, create and update the database file. Set to package visibility for test purposes.
+     * This class helps open, create and update the database file. Set to package visibility
+     * for test purposes.
      */
     private static class DatabaseHelper extends SQLiteOpenHelper {
 
@@ -114,24 +126,26 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
 
 
         /**
-         * Create the underlying database with table name and column names taken from the NotePadContract Class.
-         * @param db
+         * Create the underlying database with table name and column names taken from the
+         * NotePadContract Class.
          */
         @Override
         public void onCreate(SQLiteDatabase db) {
             db.execSQL("CREATE TABLE " + NotePadContract.Notes.TABLE_NAME + " (" +
                     NotePadContract.Notes._ID + " INTEGER PRIMARY EKY," +
-            NotePadContract.Notes.COLUMN_NAME_TITLE + " TEXT," +
-            NotePadContract.Notes.COLUMN_NAME_NOTE + " TEXT," +
-            NotePadContract.Notes.COLUMN_NAME_CREATE_DATE + " INTEGER," +
-            NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE + " INTEGER" +
-            ");");
+                    NotePadContract.Notes.COLUMN_NAME_TITLE + " TEXT," +
+                    NotePadContract.Notes.COLUMN_NAME_NOTE + " TEXT," +
+                    NotePadContract.Notes.COLUMN_NAME_CREATE_DATE + " INTEGER," +
+                    NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE + " INTEGER" +
+                    ");");
         }
 
         /**
-         * Demonstrates that the provider must consider what happens when the underlying database is changed.
+         * Demonstrates that the provider must consider what happens when the underlying database
+         * is changed.
          * In this sample, the database is upgraded by destroying the existing data.
-         * In really application, the database is supposed to be by upgrade the existing datum or schemas in place.
+         * In really application, the database is supposed to be by upgrade the existing datum or
+         * schemas in place.
          */
         @Override
         public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
@@ -144,6 +158,12 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
         }
     }
 
+    /**
+     * Initializes the provider by creating a new DatabaseHelper instance. onCreate() is called
+     * automatically
+     * when Android creates the provider in response to a resolver request from a client.
+     * @return True if provider loads successfully, otherwise return false.
+     */
     @Override
     public boolean onCreate() {
         mDatabaseHelper = new DatabaseHelper(getContext());
@@ -151,16 +171,82 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
         return true;
     }
 
+    /**
+     * This method is called when a client calls
+     * {@link android.content.ContentResolver#query(Uri, String[], String, String[], String)}.
+     * Queries the database and returns a cursor containing the results.
+     * @return {@link IllegalArgumentException} if the incoming {@link Uri} pattern is invalid.
+     */
     @Nullable
     @Override
-    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-        return null;
+    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
+                        String sortOrder) {
+        SQLiteQueryBuilder sqLiteQueryBuilder = new SQLiteQueryBuilder();
+
+        // Set the table name for SQLiteQueryBuilder (convience query class).
+        sqLiteQueryBuilder.setTables(NotePadContract.Notes.TABLE_NAME);
+
+        // Set the projection map and append the condition clause for SQLiteQueryBuilder.
+        switch (sUrimatcher.match(uri)) {
+            case NOTES:
+                sqLiteQueryBuilder.setProjectionMap(sMapNotesProjection);
+                break;
+            case NOTE_ID:
+                sqLiteQueryBuilder.setProjectionMap(sMapNotesProjection);
+                sqLiteQueryBuilder.appendWhere(
+                        NotePadContract.Notes._ID +
+                        "=" +
+                        uri.getPathSegments().get(NotePadContract.Notes.NOTE_ID_PATH_POSITION)
+                );
+                break;
+            case LIVE_FOLDER_NOTES:
+                sqLiteQueryBuilder.setProjectionMap(sMapLiveFolderProjection);
+                break;
+            default:
+                throw new
+                        IllegalArgumentException(String.format("Unknown URI %s.", uri.toString()));
+        }
+
+        // Set result set arrange order for SQLiteQueryBuilder.
+        String orderBy;
+        if (TextUtils.isEmpty(sortOrder)) {
+            orderBy = NotePadContract.Notes.DEFAULT_SORT_ORDER;
+        } else {
+            orderBy = sortOrder;
+        }
+
+        // Create if necessary and open the database.
+        SQLiteDatabase sqLiteDatabase = mDatabaseHelper.getReadableDatabase();
+
+        Cursor cursor = sqLiteQueryBuilder.query(
+                sqLiteDatabase,
+                projection,
+                selection,
+                selectionArgs,
+                null,
+                null,
+                orderBy
+        );
+
+        // Register to watch a content URI for changes. If data on URI is changed,
+        // the listener attached to the content resolver will be notified.
+        cursor.setNotificationUri(getContext().getContentResolver(), uri);
+
+        return cursor;
     }
 
     @Nullable
     @Override
     public String getType(Uri uri) {
-        return null;
+        switch (sUrimatcher.match(uri)) {
+            case NOTES:
+            case LIVE_FOLDER_NOTES:
+                return NotePadContract.Notes.CONTENT_TYPE;
+            case NOTE_ID:
+                return NotePadContract.Notes.CONTENT_ITEM_TYPE;
+            default:
+                throw new IllegalArgumentException(String.format("Unknown URI " + uri.toString()));
+        }
     }
 
     @Nullable
@@ -180,7 +266,8 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
     }
 
     @Override
-    public void writeDataToPipe(ParcelFileDescriptor output, Uri uri, String mimeType, Bundle opts, Cursor args) {
+    public void writeDataToPipe(ParcelFileDescriptor output, Uri uri, String mimeType, Bundle opts,
+                                Cursor args) {
 
     }
 }

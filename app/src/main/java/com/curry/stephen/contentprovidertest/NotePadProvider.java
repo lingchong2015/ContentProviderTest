@@ -10,7 +10,9 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
+import android.provider.LiveFolders;
 import android.support.annotation.Nullable;
+import android.util.Log;
 
 import java.util.HashMap;
 
@@ -69,6 +71,11 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
      */
     private static final UriMatcher sUrimatcher;
 
+    /**
+     * A DatabaseHelper instance.
+     */
+    private DatabaseHelper mDatabaseHelper;
+
     static {
         // Create a new UriMatcher instance.
         sUrimatcher = new UriMatcher(UriMatcher.NO_MATCH);
@@ -89,11 +96,16 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
         sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_NOTE, NotePadContract.Notes.COLUMN_NAME_NOTE);
         // Maps "created" to "created"
         sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_CREATE_DATE, NotePadContract.Notes.COLUMN_NAME_CREATE_DATE);
-        sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE, NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE);
+        sMapNotesProjection.put(NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE,
+                NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE);
 
-
+        sMapLiveFolderProjection.put(LiveFolders._ID, NotePadContract.Notes._ID + " AS " + LiveFolders._ID);
+        sMapLiveFolderProjection.put(LiveFolders.NAME, NotePadContract.Notes.COLUMN_NAME_TITLE + " AS " + LiveFolders.NAME);
     }
 
+    /**
+     * This class helps open, create and update the database file. Set to package visibility for test purposes.
+     */
     private static class DatabaseHelper extends SQLiteOpenHelper {
 
         DatabaseHelper(Context context) {
@@ -101,20 +113,42 @@ public class NotePadProvider extends ContentProvider implements ContentProvider.
         }
 
 
+        /**
+         * Create the underlying database with table name and column names taken from the NotePadContract Class.
+         * @param db
+         */
         @Override
         public void onCreate(SQLiteDatabase db) {
-
+            db.execSQL("CREATE TABLE " + NotePadContract.Notes.TABLE_NAME + " (" +
+                    NotePadContract.Notes._ID + " INTEGER PRIMARY EKY," +
+            NotePadContract.Notes.COLUMN_NAME_TITLE + " TEXT," +
+            NotePadContract.Notes.COLUMN_NAME_NOTE + " TEXT," +
+            NotePadContract.Notes.COLUMN_NAME_CREATE_DATE + " INTEGER," +
+            NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE + " INTEGER" +
+            ");");
         }
 
+        /**
+         * Demonstrates that the provider must consider what happens when the underlying database is changed.
+         * In this sample, the database is upgraded by destroying the existing data.
+         * In really application, the database is supposed to be by upgrade the existing datum or schemas in place.
+         */
         @Override
         public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+            Log.w(TAG, String.format("Upgrading database from version %d to %d, which will destroy all old data.",
+                    oldVersion, newVersion));
 
+            db.execSQL(String.format("DROP TABLE IF EXISTS %s", NotePadContract.Notes.TABLE_NAME));
+
+            onCreate(db);
         }
     }
 
     @Override
     public boolean onCreate() {
-        return false;
+        mDatabaseHelper = new DatabaseHelper(getContext());
+
+        return true;
     }
 
     @Nullable

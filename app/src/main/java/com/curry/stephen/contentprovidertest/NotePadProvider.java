@@ -1,10 +1,12 @@
 package com.curry.stephen.contentprovidertest;
 
 import android.content.ContentProvider;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.UriMatcher;
 import android.database.Cursor;
+import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.database.sqlite.SQLiteQueryBuilder;
@@ -12,7 +14,9 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.provider.LiveFolders;
+import android.provider.Settings;
 import android.support.annotation.Nullable;
+import android.test.mock.MockPackageManager;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -162,6 +166,7 @@ public class NotePadProvider extends ContentProvider
      * Initializes the provider by creating a new DatabaseHelper instance. onCreate() is called
      * automatically
      * when Android creates the provider in response to a resolver request from a client.
+     *
      * @return True if provider loads successfully, otherwise return false.
      */
     @Override
@@ -175,6 +180,7 @@ public class NotePadProvider extends ContentProvider
      * This method is called when a client calls
      * {@link android.content.ContentResolver#query(Uri, String[], String, String[], String)}.
      * Queries the database and returns a cursor containing the results.
+     *
      * @return {@link IllegalArgumentException} if the incoming {@link Uri} pattern is invalid.
      */
     @Nullable
@@ -195,8 +201,8 @@ public class NotePadProvider extends ContentProvider
                 sqLiteQueryBuilder.setProjectionMap(sMapNotesProjection);
                 sqLiteQueryBuilder.appendWhere(
                         NotePadContract.Notes._ID +
-                        "=" +
-                        uri.getPathSegments().get(NotePadContract.Notes.NOTE_ID_PATH_POSITION)
+                                "=" +
+                                uri.getPathSegments().get(NotePadContract.Notes.NOTE_ID_PATH_POSITION)
                 );
                 break;
             case LIVE_FOLDER_NOTES:
@@ -245,24 +251,119 @@ public class NotePadProvider extends ContentProvider
             case NOTE_ID:
                 return NotePadContract.Notes.CONTENT_ITEM_TYPE;
             default:
-                throw new IllegalArgumentException(String.format("Unknown URI " + uri.toString()));
+                throw new IllegalArgumentException(String.format("Unknown URI %s", uri.toString()));
         }
     }
 
     @Nullable
     @Override
     public Uri insert(Uri uri, ContentValues values) {
-        return null;
+        if (sUrimatcher.match(uri) != NOTES) {
+            throw new IllegalArgumentException(String.format("Unknown URI %s", uri.toString()));
+        }
+
+        ContentValues contentValues;
+
+        if (values == null) {
+            contentValues = new ContentValues();
+        } else {
+            contentValues = new ContentValues(values);
+        }
+
+        long now = System.currentTimeMillis();
+
+        if (contentValues.containsKey(NotePadContract.Notes.COLUMN_NAME_CREATE_DATE)) {
+            contentValues.put(NotePadContract.Notes.COLUMN_NAME_CREATE_DATE, now);
+        }
+
+        if (contentValues.containsKey(NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE)) {
+            contentValues.put(NotePadContract.Notes.COLUMN_NAME_MODIFICATION_DATE, now);
+        }
+
+        if (contentValues.containsKey(NotePadContract.Notes.COLUMN_NAME_TITLE)) {
+            contentValues.put(NotePadContract.Notes.COLUMN_NAME_TITLE, getContext().getString(R.string.untitled));
+        }
+
+        if (contentValues.containsKey(NotePadContract.Notes.COLUMN_NAME_NOTE)) {
+            contentValues.put(NotePadContract.Notes.COLUMN_NAME_NOTE, "");
+        }
+
+        SQLiteDatabase sqLiteDatabase = mDatabaseHelper.getWritableDatabase();
+
+        long rowID = sqLiteDatabase.insert(
+                NotePadContract.Notes.TABLE_NAME,
+                NotePadContract.Notes.COLUMN_NAME_NOTE, // A hack for inserting a row which
+                                                        // nullHackColumn's value is explicitly
+                                                        // set NULL value when the
+                                                        // contentValues is empty.
+                contentValues
+        );
+
+        if (rowID > 0) {
+            Uri rowUri = ContentUris.withAppendedId(NotePadContract.Notes.CONTENT_ID_URI_BASE, rowID);
+
+            // Notify all observers which registered to the ContentResolver of some change being
+            // happened on the URI.
+            getContext().getContentResolver().notifyChange(rowUri, null);
+
+            return rowUri;
+        } else {
+            throw new SQLException(String.format("Failed to insert new row into %s", uri.toString()));
+        }
     }
 
     @Override
     public int delete(Uri uri, String selection, String[] selectionArgs) {
-        return 0;
+        int count;
+        SQLiteDatabase sqLiteDatabase = mDatabaseHelper.getWritableDatabase();
+
+        switch (sUrimatcher.match(uri)) {
+            case NOTES:
+                count = sqLiteDatabase.delete(NotePadContract.Notes.TABLE_NAME, selection, selectionArgs);
+                break;
+            case NOTE_ID:
+                String finalWhere = NotePadContract.Notes._ID + " = " +
+                        uri.getPathSegments().get(NotePadContract.Notes.NOTE_ID_PATH_POSITION);
+                finalWhere = selection != null ? finalWhere + " AND " + selection: finalWhere;
+                count = sqLiteDatabase.delete(NotePadContract.Notes.TABLE_NAME, finalWhere, selectionArgs);
+                break;
+            default:
+                throw new IllegalArgumentException(String.format("Unknown URI %s", uri.toString()));
+        }
+
+        getContext().getContentResolver().notifyChange(uri, null);
+
+        return count;
     }
 
     @Override
     public int update(Uri uri, ContentValues values, String selection, String[] selectionArgs) {
-        return 0;
+        int count;
+        SQLiteDatabase sqLiteDatabase = mDatabaseHelper.getWritableDatabase();
+
+        switch (sUrimatcher.match(uri)) {
+            case NOTES:
+                count = sqLiteDatabase.update(NotePadContract.Notes.TABLE_NAME, values, selection,
+                        selectionArgs);
+                break;
+            case NOTE_ID:
+                String finalWhere = NotePadContract.Notes._ID + " = " +
+                        uri.getPathSegments().get(NotePadContract.Notes.NOTE_ID_PATH_POSITION);
+                finalWhere = selection != null ? finalWhere + " AND " + selection : finalWhere;
+                count = sqLiteDatabase.update(NotePadContract.Notes.TABLE_NAME, values, finalWhere,
+                        selectionArgs);
+                break;
+            default:
+                throw new IllegalArgumentException(String.format("Unknown URI %s", uri.toString()));
+        }
+
+        getContext().getContentResolver().notifyChange(uri, null);
+
+        return count;
+    }
+
+    DatabaseHelper getOpenHelperForTest() {
+        return mDatabaseHelper;
     }
 
     @Override

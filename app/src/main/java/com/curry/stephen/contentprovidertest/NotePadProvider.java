@@ -1,10 +1,12 @@
 package com.curry.stephen.contentprovidertest;
 
+import android.content.ClipDescription;
 import android.content.ContentProvider;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.UriMatcher;
+import android.content.res.AssetFileDescriptor;
 import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
@@ -20,6 +22,13 @@ import android.test.mock.MockPackageManager;
 import android.text.TextUtils;
 import android.util.Log;
 
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 
 /**
@@ -83,6 +92,11 @@ public class NotePadProvider extends ContentProvider
      */
     private DatabaseHelper mDatabaseHelper;
 
+    /**
+     * This describes the MIME types that are supported for opening a note URI as a stream.
+     */
+    private static final ClipDescription NOTE_STREAM_TYPES;
+
     static {
         // Create a new UriMatcher instance.
         sUrimatcher = new UriMatcher(UriMatcher.NO_MATCH);
@@ -116,6 +130,10 @@ public class NotePadProvider extends ContentProvider
                 NotePadContract.Notes._ID + " AS " + LiveFolders._ID);
         sMapLiveFolderProjection.put(LiveFolders.NAME,
                 NotePadContract.Notes.COLUMN_NAME_TITLE + " AS " + LiveFolders.NAME);
+
+        NOTE_STREAM_TYPES = new ClipDescription(null, new String[] {
+                ClipDescription.MIMETYPE_TEXT_PLAIN
+        });
     }
 
     /**
@@ -293,9 +311,9 @@ public class NotePadProvider extends ContentProvider
         long rowID = sqLiteDatabase.insert(
                 NotePadContract.Notes.TABLE_NAME,
                 NotePadContract.Notes.COLUMN_NAME_NOTE, // A hack for inserting a row which
-                                                        // nullHackColumn's value is explicitly
-                                                        // set NULL value when the
-                                                        // contentValues is empty.
+                // nullHackColumn's value is explicitly
+                // set NULL value when the
+                // contentValues is empty.
                 contentValues
         );
 
@@ -366,9 +384,70 @@ public class NotePadProvider extends ContentProvider
         return mDatabaseHelper;
     }
 
+    @Nullable
+    @Override
+    public String[] getStreamTypes(Uri uri, String mimeTypeFilter) {
+        switch (sUrimatcher.match(uri)) {
+            case NOTES:
+            case LIVE_FOLDER_NOTES:
+                return null;
+            case NOTE_ID:
+                return NOTE_STREAM_TYPES.filterMimeTypes(mimeTypeFilter);
+            default:
+                throw new IllegalArgumentException(String.format("Unknown URI %s", uri.toString()));
+        }
+    }
+
+    @Nullable
+    @Override
+    public AssetFileDescriptor openTypedAssetFile(Uri uri, String mimeTypeFilter, Bundle opts) throws FileNotFoundException {
+        String[] mimeTypes = getStreamTypes(uri, mimeTypeFilter);
+        if (mimeTypes == null) {
+            return super.openTypedAssetFile(uri, mimeTypeFilter, opts);
+        } else {
+            Cursor cursor = query(
+                    uri,
+                    READ_NOTE_PROJECTION,
+                    null,
+                    null,
+                    null
+            );
+
+            if (cursor == null || !cursor.moveToFirst()) {
+                if (cursor != null) {
+                    cursor.close();
+                    return null;
+                } else {
+                    throw new FileNotFoundException(String.format("Unable to query %s", uri));
+                }
+            }
+
+            return new AssetFileDescriptor(openPipeHelper(uri, mimeTypes[0], opts, cursor, this), 0, AssetFileDescriptor.UNKNOWN_LENGTH);
+        }
+    }
+
     @Override
     public void writeDataToPipe(ParcelFileDescriptor output, Uri uri, String mimeType, Bundle opts,
                                 Cursor args) {
-
+        FileOutputStream fileOutputStream = new FileOutputStream(output.getFileDescriptor());
+        PrintWriter printWriter = null;
+        try {
+            printWriter = new PrintWriter(new OutputStreamWriter(fileOutputStream, "UTF-8"));
+            printWriter.println(args.getString(READ_NOTE_TITLE_INDEX));
+            printWriter.println();
+            printWriter.println(args.getString(READ_NOTE_NOTE_INDEX));
+        } catch (UnsupportedEncodingException e) {
+            e.printStackTrace();
+        } finally {
+            args.close();
+            if (printWriter != null) {
+                printWriter.flush();
+            }
+            try {
+                fileOutputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
